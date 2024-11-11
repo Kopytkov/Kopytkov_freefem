@@ -1,0 +1,93 @@
+func real[int] BiCGStabMethod(matrix& A, real[int]& rhs, real eps, int maxIter) {
+    // Initial conditions
+    int n = rhs.n; /* Size of system */
+    real[int] xSolve(n); 
+    real[int] r(n), r0(n), r1(n);      
+    real[int] v(n), s(n), t(n), p(n), tHat(n), vHat(n); 
+    real alpha = 1, omega = 1, delta, beta, theta, phi, psi, rhoNext;
+    xSolve = 0;
+    r1 = A*xSolve;
+    r = rhs - r1;
+    r0 = r;
+    real rho = r'*r;          
+
+    /* Define Jacobi preconditioner */
+    matrix Kinv(n, n);  /* Matrix for Jacobi preconditioner */
+
+    /* Fill the Kinv (K^-1) matrix with inverse diagonal elements */
+    for (int i = 0; i < n; i++) {
+        real diagElement = A(i, i); /* Extract diagonal element */
+        if (diagElement != 0) {
+            Kinv(i, i) = 1.0 / diagElement; /* Set inverse element on diagonal */
+        } else {
+            Kinv(i, i) = 1.0; /* Handle zero diagonal elements */
+        }
+    }
+
+    p = Kinv * r;
+    vHat = p;
+
+    real rhsNorm = sqrt(rhs'*rhs); /*The norm of rhs */
+    real rNorm = sqrt(r'*r); /*The norm of approximation */
+    int iter = 0;
+    /*Main loop of BiCGStab */
+    while (rNorm / rhsNorm > eps && iter < maxIter) {
+        v = A * vHat;
+        delta = v'*r0;
+        // cout << "delta = " << delta << endl;
+        s = Kinv * v;          // Apply Jacobi preconditioner
+        // cout << "s = " << s << endl;
+        alpha = rho / delta;
+        
+        tHat = p - alpha * s;
+        // cout << "tHat = " << tHat << endl;
+        t = A * tHat;
+        
+        xSolve += alpha * vHat;
+        r -= alpha * v;
+        
+        // Check for convergence
+        if (sqrt(r'*r) < eps) break;
+        
+        // Continue the step
+        theta = t'*r;
+        phi = t'*t;
+        psi = t'*r0;
+        p = Kinv * t;
+        omega = theta / phi;
+        // cout << "omega = " << omega << endl;
+        
+        xSolve += omega * tHat;
+        r -= omega * t;
+        
+        rhoNext = -omega * psi;
+        p = tHat - omega * p;
+        // p += tHat;
+        beta = (rhoNext * alpha) / (rho * omega);
+        
+        vHat -= omega * s;
+        vHat = p + beta * vHat;
+        
+        rNorm = sqrt(r' * r);
+        rho = rhoNext;
+
+        iter++;
+    }
+
+    // Check and output the result
+    cout << "iterBicGStab = " << iter << endl;
+    return xSolve;
+    
+}
+
+// Problem parameters
+// matrix A = [[1, 3, 0, 2],
+//             [0, 5, 0, 6],
+//             [5, 0, 1, 0],
+//             [0, 10, 0, 3]]; /* Test matrix */
+
+// real[int] rhs = [1, 2, 0, 4]; /* Right-hand side vector */
+// real eps = 1e-12;     // Convergence threshold
+// int maxIter = 1000;  // Maximum number of iterations
+// real[int] xSolve = BiCGStabMethod(A, rhs, eps, maxIter);
+// cout << "Solution x: " << xSolve << endl;
