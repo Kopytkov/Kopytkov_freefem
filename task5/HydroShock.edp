@@ -1,0 +1,129 @@
+/* Define geometric*/
+real h = 1.1;
+real H = 1.7;
+real LHuge = 4.5;
+real L = 3.1;
+real l = 2.0;
+real dL = L - l;
+
+int labelIn = 1;
+int labelWall = 2;
+int labelOut = 3;
+
+border G1(t=0, h) {x = 0; y = H + t; label = labelIn;}       /* From G1 to G2 (along x-axis) */
+border G2(t=0, L) {x = t; y = H + h; label = labelWall;}       /* From G2 to G3 (along y-axis) */
+border G3(t=0, H) {x = L; y = H + h - t; label = labelWall;}   /* From G3 to G4 (back along x-axis) */
+border G4(t=0, LHuge) {x = L + t; y = h; label = labelWall;}   /* From G4 to G5 (along y-axis) */
+border G5(t=0, h) {x = L + LHuge; y = h - t; label = labelOut;}       /* From G5 to G6 (back along x-axis) */
+border G6(t=0, (LHuge + dL)) {x = L + LHuge - t; y = 0; label = labelWall;}   /* From G6 to G7 (back along y-axis) */
+border G7(t=0, H) {x = l; y = t; label = labelWall;}   /* From G7 to G8 (along x-axis) */
+border G8(t=0, l) {x = l - t; y = H; label = labelWall;}   /* Close the contour (along y-axis) */
+
+int n = 30;
+
+/* Create the mesh */
+mesh Th = buildmesh(G1(-n) + G2(-n) + G3(-n) + G4(-n) + G5(-n) + G6(-n) + G7(-n) + G8(-n));
+
+/* Visualize the mesh */
+plot(Th, cmm = "Mesh of the domain", wait=0);
+
+/* Declaration of variables */
+real epsilon = 1e-8;
+real rho = 1000;  /* Fluid density (kg/m^3) */
+real mu = 0.001;  /* Dynamic viscosity (Pa·s) */
+real d = 0.1; /* Diameter of tube (m) */
+real E = 2e11; /* Young's modulus (Pa) */
+real delta = 0.007; /* tube thickness (m)*/
+real beta = 5.0 * 1e-10; /* Fluid compressibility (Pa^-1) */
+
+real dt = 0.01;   /* Time step (s) */
+real alpha = rho / dt;
+int T = 100;  /* Max time (s) */
+real Um = 1e-4; /* Mean velosity (m/s)*/
+func a = 1.0 / sqrt(rho * beta + rho * d / (E*delta)); /* Speed of wave propagation (m/s) */
+func vx0 = 6.0*Um*(H+h-y)*(y-H) / (h^2); /* Parabolic profil (m/s) */
+func vy0 = 0;
+func p0 = 1e5; /* Pressure on Out (Pa) */
+
+/*Differential operators*/
+macro grad(u) [dx(u), dy(u)] //EOM  /*EOM = End Of Macros*/
+macro div(u1, u2) (dx(u1) + dy(u2)) //EOM
+
+/* Definition of function spaces */
+fespace Vh(Th, [P2, P2, P1]);
+fespace Vh1(Th, P1); 
+fespace Vh2(Th, P2); 
+
+Vh [vx, vy, p], [psi1, psi2, q], [psi1New, psi2New, qNew];
+
+Vh1 pOld = p0;
+Vh2 vxOld = vx0, vyOld = vy0, f;
+
+/* Weak formulation of the problem */
+problem hydro([vx, vy, p], [psi1, psi2, q]) =
+    int2d(Th)(p*q/dt)
+    + int2d(Th)(
+        - convect([vxOld, vyOld], -dt, pOld)*q / dt
+    )
+    + int2d(Th)(
+        rho * (a)^2 * div(vx, vy) * q
+        + epsilon*p*q
+    )
+    + int2d(Th)(alpha*[vx, vy]'*[psi1, psi2])
+    + int2d(Th)(
+        - alpha*convect([vxOld, vyOld],-dt,vxOld)*psi1 
+        - alpha*convect([vxOld, vyOld],-dt,vyOld)*psi2
+    )
+    + int2d(Th)(
+        grad(p)'*[psi1, psi2]
+        + 32.0 * mu * rho / (d^2) * [vx, vy] '*[psi1, psi2]
+    )
+    + on(labelIn, vx=vx0, vy=0)
+    + on(labelWall, vx=0, vy=0)
+    + on(labelOut, vx = f, vy = 0, p=p0);
+
+problem hydroNew([vx, vy, p], [psi1, psi2, q]) =
+    int2d(Th)(p*q/dt)
+    + int2d(Th)(
+        - convect([vxOld, vyOld], -dt, pOld)*q / dt
+    )
+    + int2d(Th)(
+        rho * (a)^2 * div(vx, vy) * q
+        + epsilon*p*q
+    )
+    + int2d(Th)(alpha*[vx, vy]'*[psi1, psi2])
+    + int2d(Th)(
+        - alpha*convect([vxOld, vyOld],-dt,vxOld)*psi1 
+        - alpha*convect([vxOld, vyOld],-dt,vyOld)*psi2
+    )
+    + int2d(Th)(
+        grad(p)'*[psi1, psi2]
+        + 32.0 * mu * rho / (d^2) * [vx, vy] '*[psi1, psi2]
+    )
+    + on(labelIn, vx=vx0, vy=0)
+    + on(labelWall, vx=0, vy=0)
+    + on(labelOut, vx = 0, vy = 0);
+
+real t = 0;
+real t0 = 2.5;
+/* Time-stepping loop to solve the problem */
+while(t < T) {
+    if (t <= t0){
+        hydro;
+        pOld = p;
+        vxOld = vx;
+        vyOld = vy;
+        f = convect([vx, vy], -dt, vxOld);
+    }
+    else {
+        hydroNew;
+        pOld = p;
+        vxOld = vx;
+        vyOld = vy;
+    }
+
+    string plotTitle = "VelocityX, time = " + t;
+    /* Visualization */
+    plot(vx, cmm = plotTitle, wait = 0, fill = 1, value = 1, nbiso = 30);
+    t += dt;
+}
