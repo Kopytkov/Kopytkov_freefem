@@ -1,7 +1,8 @@
+load "iovtk"
 /* Define geometric*/
 real h = 1.1;
 real H = 1.7;
-real LHuge = 4.5;
+real LHuge = 8.5;
 real L = 3.1;
 real l = 2.0;
 real dL = L - l;
@@ -28,7 +29,6 @@ mesh Th = buildmesh(G1(-n) + G2(-n) + G3(-n) + G4(-n) + G5(-n) + G6(-n) + G7(-n)
 plot(Th, cmm = "Mesh of the domain", wait=0);
 
 /* Declaration of variables */
-real epsilon = 1e-8;
 real rho = 1000;  /* Fluid density (kg/m^3) */
 real mu = 0.001;  /* Dynamic viscosity (Pa·s) */
 real d = 0.1; /* Diameter of tube (m) */
@@ -36,14 +36,15 @@ real E = 2e11; /* Young's modulus (Pa) */
 real delta = 0.007; /* tube thickness (m)*/
 real beta = 5.0 * 1e-10; /* Fluid compressibility (Pa^-1) */
 
-real dt = 0.01;   /* Time step (s) */
+real dt = 0.1;   /* Time step (s) */
 real alpha = rho / dt;
-int T = 100;  /* Max time (s) */
-real Um = 1e-4; /* Mean velosity (m/s)*/
+real T = 5.60071;  /* Max time (s) */
+real Um = 1e-2; /* Mean velosity (m/s)*/
 func a = 1.0 / sqrt(rho * beta + rho * d / (E*delta)); /* Speed of wave propagation (m/s) */
 func vx0 = 6.0*Um*(H+h-y)*(y-H) / (h^2); /* Parabolic profil (m/s) */
 func vy0 = 0;
 func p0 = 1e5; /* Pressure on Out (Pa) */
+func dp = rho*1.5*Um*a;
 
 /*Differential operators*/
 macro grad(u) [dx(u), dy(u)] //EOM  /*EOM = End Of Macros*/
@@ -54,9 +55,8 @@ fespace Vh(Th, [P2, P2, P1]);
 fespace Vh1(Th, P1); 
 fespace Vh2(Th, P2); 
 
-Vh [vx, vy, p], [psi1, psi2, q], [psi1New, psi2New, qNew];
-
-Vh1 pOld = p0;
+Vh [vx, vy, p], [psi1, psi2, q];
+Vh1 pOld = p0, vxP1, vyP1;
 Vh2 vxOld = vx0, vyOld = vy0, f;
 
 /* Weak formulation of the problem */
@@ -67,7 +67,6 @@ problem hydro([vx, vy, p], [psi1, psi2, q]) =
     )
     + int2d(Th)(
         rho * (a)^2 * div(vx, vy) * q
-        + epsilon*p*q
     )
     + int2d(Th)(alpha*[vx, vy]'*[psi1, psi2])
     + int2d(Th)(
@@ -89,7 +88,6 @@ problem hydroNew([vx, vy, p], [psi1, psi2, q]) =
     )
     + int2d(Th)(
         rho * (a)^2 * div(vx, vy) * q
-        + epsilon*p*q
     )
     + int2d(Th)(alpha*[vx, vy]'*[psi1, psi2])
     + int2d(Th)(
@@ -102,28 +100,69 @@ problem hydroNew([vx, vy, p], [psi1, psi2, q]) =
     )
     + on(labelIn, vx=vx0, vy=0)
     + on(labelWall, vx=0, vy=0)
-    + on(labelOut, vx = 0, vy = 0);
+    + on(labelOut, vx = 0, vy = 0, p=p0+dp);
 
 real t = 0;
-real t0 = 2.5;
+real eps = 1e-8;
+real velL2AbsError = 1.0;
+int iter = 0;
+
+/* Save the mesh to .vtu-file */
+int[int] order = [1, 1, 1];
+ofstream pvdFile("solution.pvd");
+pvdFile << "<?xml version=\"1.0\"?>\n";
+pvdFile << "<VTKFile type=\"Collection\" version=\"0.1\" byte_order=\"LittleEndian\">\n";
+pvdFile << "  <Collection>\n";
+
 /* Time-stepping loop to solve the problem */
 while(t < T) {
-    if (t <= t0){
+    string plotTitle = "VelocityX, time = " + t + "\n VelL2AbsError = " + velL2AbsError;
+    if (velL2AbsError > eps){
         hydro;
+        vxP1 = vx;
+        vyP1 = vy;
+
+        /* Save the mesh to .vtu-file */
+        string filename = "sol" + iter + ".vtu";
+        savevtk(filename, dataname = "v p",
+            Th, [vxP1, vyP1], p, order=order);
+        pvdFile << "<DataSet timestep=\"" << t << "\" group=\"\" part=\"0\" file=\"" << filename << "\"/>\n";
+        iter++;
+
+        velL2AbsError = 
+            sqrt(
+                int2d(Th)(
+                    abs((vxOld - vx)^2 + (vyOld - vy)^2)
+                )
+            );
         pOld = p;
         vxOld = vx;
         vyOld = vy;
         f = convect([vx, vy], -dt, vxOld);
+        /* Visualization */
+        plot(p, cmm = plotTitle, wait = 0, fill = 1, value = 1, nbiso = 27);
+        t += dt;
     }
     else {
+        dt = 1e-5;
         hydroNew;
+        vxP1 = vx;
+        vyP1 = vy;
+
+        /* Save the mesh to .vtu-file */
+        string filename = "sol" + iter + ".vtu";
+        savevtk(filename, dataname = "v p",
+            Th, [vxP1, vyP1], p, order=order);
+        pvdFile << "<DataSet timestep=\"" << t << "\" group=\"\" part=\"0\" file=\"" << filename << "\"/>\n";
+        iter++;
+
         pOld = p;
         vxOld = vx;
         vyOld = vy;
+        /* Visualization */
+        plot(p, cmm = plotTitle, wait = 0, fill = 1, value = 1, nbiso = 27);
+        t += dt;
     }
-
-    string plotTitle = "VelocityX, time = " + t;
-    /* Visualization */
-    plot(vx, cmm = plotTitle, wait = 0, fill = 1, value = 1, nbiso = 30);
-    t += dt;
 }
+pvdFile << "  </Collection>\n";
+pvdFile << "</VTKFile>\n";
