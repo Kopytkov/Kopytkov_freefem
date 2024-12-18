@@ -59,6 +59,11 @@ Vh [vx, vy, p], [psi1, psi2, q];
 Vh1 pOld = p0, vxP1, vyP1;
 Vh2 vxOld = vx0, vyOld = vy0, f;
 
+real t = 0;
+real eps = 1e-8;
+real velL2AbsError = 1.0;
+int iter = 0;
+
 /* Weak formulation of the problem */
 problem hydro([vx, vy, p], [psi1, psi2, q]) =
     int2d(Th)(p*q/dt)
@@ -102,17 +107,18 @@ problem hydroNew([vx, vy, p], [psi1, psi2, q]) =
     + on(labelWall, vx=0, vy=0)
     + on(labelOut, vx = 0, vy = 0, p=p0+dp);
 
-real t = 0;
-real eps = 1e-8;
-real velL2AbsError = 1.0;
-int iter = 0;
-
 /* Save the mesh to .vtu-file */
 int[int] order = [1, 1, 1];
 ofstream pvdFile("solution.pvd");
 pvdFile << "<?xml version=\"1.0\"?>\n";
 pvdFile << "<VTKFile type=\"Collection\" version=\"0.1\" byte_order=\"LittleEndian\">\n";
 pvdFile << "  <Collection>\n";
+
+real x1 = 0.0, y1 = H;  /* start point */
+real x2 = 0.0, y2 = H + h;  /* end point */
+real length = sqrt((x2 - x1)^2 + (y2-y1)^2);
+int np = 5;  /* number of point */
+ofstream file("HydroPressure.txt");
 
 /* Time-stepping loop to solve the problem */
 while(t < T) {
@@ -139,6 +145,18 @@ while(t < T) {
         vxOld = vx;
         vyOld = vy;
         f = convect([vx, vy], -dt, vxOld);
+
+        /* Work with file */
+        {
+
+            for (int i = 0; i < np; i++){
+                real si = length * (i / real(np - 1)); /*param of section */
+                real xsi = x1 + si * (x2 - x1) / length;
+                real ysi = y1 + si * (y2 - y1) / length;
+                real pValue = p(xsi, ysi);
+                file << t << " " << si << " " << pValue << endl;
+            }
+        }
         /* Visualization */
         plot(p, cmm = plotTitle, wait = 0, fill = 1, value = 1, nbiso = 27);
         t += dt;
@@ -159,6 +177,18 @@ while(t < T) {
         pOld = p;
         vxOld = vx;
         vyOld = vy;
+
+        /* Work with file */
+        {
+
+            for (int i = 0; i < np; i++){
+                real si = length * (i / real(np - 1)); /*param of section */
+                real xsi = x1 + si * (x2 - x1) / length;
+                real ysi = y1 + si * (y2 - y1) / length;
+                real pValue = p(xsi, ysi);
+                file << t << " " << si << " " << pValue << endl;
+            }
+        }
         /* Visualization */
         plot(p, cmm = plotTitle, wait = 0, fill = 1, value = 1, nbiso = 27);
         t += dt;
