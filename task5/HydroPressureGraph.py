@@ -10,6 +10,8 @@ with open(data_file, "r") as file:
         t, y, pressure = map(float, line.split())
         data[y].append((t, pressure))
 
+title = "Lower bound"
+count = 0
 # Построение графиков
 for y, values in data.items():
     values.sort()  # Убедимся, что данные отсортированы по времени
@@ -17,10 +19,18 @@ for y, values in data.items():
     
     plt.figure()
     plt.plot(t_values, pressure_values, marker="o")
-    plt.title(f"Pressure - Time for (x, y) = (0, {y})")
+    if count == 0:
+        plt.title(f"Pressure - Time for (x, y) = (0, {y}) \n {title}" )
+        count = 1
+        title = "Middle"
+    if count == 1:
+        plt.title(f"Pressure - Time for (x, y) = (0, {y}) \n {title}" )
+        count = 2
+        title = "Upper bound"
+    if count == 2:
+        plt.title(f"Pressure - Time for (x, y) = (0, {y}) \n {title}" )
     plt.xlabel("Time, [s]")
     plt.ylabel("Pressure, [Pa]")
     plt.grid(True)
-    plt.savefig(f"pressure_y_{y}.png")  # Сохранение графика
+    plt.savefig(f"pressure_y_{y}.png")
     plt.show()  # Показ графика
-
