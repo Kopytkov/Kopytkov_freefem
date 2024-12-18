@@ -21,11 +21,9 @@ for y, values in data.items():
     plt.plot(t_values, pressure_values, marker="o")
     if count == 0:
         plt.title(f"Pressure - Time for (x, y) = (0, {y}) \n {title}" )
-        count = 1
         title = "Middle"
     if count == 1:
         plt.title(f"Pressure - Time for (x, y) = (0, {y}) \n {title}" )
-        count = 2
         title = "Upper bound"
     if count == 2:
         plt.title(f"Pressure - Time for (x, y) = (0, {y}) \n {title}" )
@@ -34,3 +32,4 @@ for y, values in data.items():
     plt.grid(True)
     plt.savefig(f"pressure_y_{y}.png")
     plt.show()  # Показ графика
+    count += 1
