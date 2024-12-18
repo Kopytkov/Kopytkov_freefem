@@ -147,14 +147,15 @@ while(t < T) {
         f = convect([vx, vy], -dt, vxOld);
 
         /* Work with file */
-        {
-
-            for (int i = 0; i < np; i++){
-                real si = length * (i / real(np - 1)); /*param of section */
-                real xsi = x1 + si * (x2 - x1) / length;
-                real ysi = y1 + si * (y2 - y1) / length;
-                real pValue = p(xsi, ysi);
-                file << t << " " << ysi << " " << pValue << endl;
+        if (t != 0){
+            {
+                for (int i = 0; i < np; i++){
+                    real si = length * (i / real(np - 1)); /*param of section */
+                    real xsi = x1 + si * (x2 - x1) / length;
+                    real ysi = y1 + si * (y2 - y1) / length;
+                    real pValue = p(xsi, ysi);
+                    file << t << " " << ysi << " " << pValue << endl;
+                }
             }
         }
         /* Visualization */
