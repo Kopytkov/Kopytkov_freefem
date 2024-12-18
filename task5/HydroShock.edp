@@ -117,7 +117,7 @@ pvdFile << "  <Collection>\n";
 real x1 = 0.0, y1 = H;  /* start point */
 real x2 = 0.0, y2 = H + h;  /* end point */
 real length = sqrt((x2 - x1)^2 + (y2-y1)^2);
-int np = 5;  /* number of point */
+int np = 3;  /* number of point */
 ofstream file("HydroPressure.txt");
 
 /* Time-stepping loop to solve the problem */
@@ -154,7 +154,7 @@ while(t < T) {
                 real xsi = x1 + si * (x2 - x1) / length;
                 real ysi = y1 + si * (y2 - y1) / length;
                 real pValue = p(xsi, ysi);
-                file << t << " " << si << " " << pValue << endl;
+                file << t << " " << ysi << " " << pValue << endl;
             }
         }
         /* Visualization */
@@ -186,7 +186,7 @@ while(t < T) {
                 real xsi = x1 + si * (x2 - x1) / length;
                 real ysi = y1 + si * (y2 - y1) / length;
                 real pValue = p(xsi, ysi);
-                file << t << " " << si << " " << pValue << endl;
+                file << t << " " << ysi << " " << pValue << endl;
             }
         }
         /* Visualization */
